@@ -1,0 +1,11 @@
+{
+    "name": "wp-flysystem-s3",
+    "type": "mu-plugin",
+    "description": "Upload wordpress media files to s3 media library",
+    "entry": "index.php",
+    "output": "dist/wp-flysystem-s3.php",
+    "dependencies": {
+        "league/flysystem-aws-s3-v3": "^2.0",
+        "doctrine/dbal": "^3.0"
+    }
+}

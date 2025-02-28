@@ -1,52 +1,69 @@
 <?php
 /**
-* Plugin Name: Wordpress Flysystem S3
-* Plugin URI: https://bluc.ir/
-* Description: Upload wordpress media files to s3 media library
-* Version: 1.0.0
-* Author: Mehdi Abedi
-* Author URI: https://bluc.ir/
-**/
+ * Plugin Name: Wordpress Flysystem S3
+ * Plugin URI: https://bluc.ir/
+ * Description: Upload wordpress media files to s3 media library
+ * Version: 1.0.0
+ * Author: Mehdi Abedi
+ * Author URI: https://bluc.ir/
+ **/
 
 if (!defined('ABSPATH')) {
-	exit(1);
+    exit(1);
 }
+
+if (file_exists(__DIR__ . "/vendor/autoload.php")) {
+    require __DIR__ . "/vendor/autoload.php";
+} else {
+    spl_autoload_register(function ($class) {
+        if (strpos($class, 'Abedi\\WPFlysystemS3\\') === 0) {
+            $file = __DIR__ . '/src/' . str_replace('\\', '/', substr($class, 19)) . '.php';
+            if (file_exists($file)) {
+                require $file;
+            }
+        }
+    });
+}
+
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Schema\Schema;
 
 function createDatabaseIfNeeded()
 {
-	global $wpdb;
-	$table_name = $wpdb->base_prefix.'fs_s3_files';
-	$query = $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table_name ) );
+    global $wpdb;
 
-	$result = $wpdb->get_var( $query );
+    $tableName = $wpdb->base_prefix . 'fs_s3_files';
+    $connection = Abedi\WPFlysystemS3\DatabaseConnection::getConnection();
 
-	if ( $result == $table_name ) {
-		return;
-	}
+    // Check if table exists
+    $schemaManager = $connection->createSchemaManager();
+    if ($schemaManager->tablesExist([$tableName])) {
+        return;
+    }
 
-	$charset_collate = $wpdb->get_charset_collate();
+    // Create the table schema
+    $schema = new Schema();
+    $table = $schema->createTable($tableName);
+    $table->addColumn('id', 'integer', ['autoincrement' => true, 'unsigned' => true]);
+    $table->addColumn('local_file', 'string', ['length' => 512]);
+    $table->addColumn('remote_file', 'string', ['length' => 512]);
+    $table->addColumn('md5', 'string', ['length' => 32, 'fixed' => true]);
+    $table->addColumn('count', 'smallint', ['unsigned' => true]);
+    $table->setPrimaryKey(['id']);
+    $table->addUniqueIndex(['local_file', 'remote_file', 'md5'], 'unique_local_remote_md5');
+    $table->addIndex(['md5'], 'md5_index');
 
-	$query = "CREATE TABLE `{$table_name}` (
-		`id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-		`local_file` varchar(512) COLLATE utf8mb4_unicode_520_ci NOT NULL,
-		`remote_file` varchar(512) COLLATE utf8mb4_unicode_520_ci NOT NULL,
-		`md5` varchar(32) CHARACTER SET latin1 COLLATE latin1_danish_ci NOT NULL,
-		`count` smallint(5) unsigned NOT NULL,
-		PRIMARY KEY (`id`),
-		UNIQUE KEY `local_file` (`local_file`,`remote_file`,`md5`) USING HASH,
-		KEY `md5` (`md5`)
-	) {$charset_collate};";
-
-	require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-	$res = dbDelta($query);
+    // Execute the schema creation
+    $queries = $schema->toSql($connection->getDatabasePlatform());
+    foreach ($queries as $query) {
+        $connection->executeStatement($query);
+    }
 }
 
 register_activation_hook(
-	__FILE__,
-	'createDatabaseIfNeeded'
+    __FILE__,
+    'createDatabaseIfNeeded'
 );
-
-require __DIR__."/vendor/autoload.php";
 
 $serviceProvider = Abedi\WPFlysystemS3\ServiceProvider::getInstance();
 $serviceProvider->boot();

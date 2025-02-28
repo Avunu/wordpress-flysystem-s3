@@ -2,6 +2,8 @@
 
 namespace Abedi\WPFlysystemS3;
 
+use Doctrine\DBAL\Connection;
+
 class AttachmentManager
 {
 	public static function getInstance(): self
@@ -27,9 +29,14 @@ class AttachmentManager
 	{
 		$result = $this->getByLocalFile($localPath);
         if ($result) {
-			$this->dbManager->getDB()->query($this->dbManager->getDB()->prepare("UPDATE {$this->dbManager->getTable()} SET `count` = `count` + 1 WHERE `id` = %d", $result->id));
+			$this->dbManager->getConnection()->createQueryBuilder()
+                ->update($this->dbManager->getTable())
+                ->set('count', 'count + 1')
+                ->where('id = :id')
+                ->setParameter('id', $result['id'])
+                ->executeStatement();
 
-            return $result->id;
+            return $result['id'];
         }
 
 		$storage = $this->s3Manager->getStorage();
@@ -55,28 +62,36 @@ class AttachmentManager
             fclose($stream);
         }
 
-		$result = $this->dbManager->getDB()->insert(
-			$this->dbManager->getTable(),
-			[
-				'md5' => $name,
-				'local_file' => $localPath,
-				'remote_file' => $this->s3Manager->getUrl(implode('/', $parts).'/'.$name.$extention),
-				'count' => 1,
-			]
-		);
-		if (!$result) {
-			throw new \Exception('Can not insert new attachment');
-		}
+		$this->dbManager->getConnection()->createQueryBuilder()
+            ->insert($this->dbManager->getTable())
+            ->values([
+                'md5' => ':md5',
+                'local_file' => ':local_file',
+                'remote_file' => ':remote_file',
+                'count' => ':count'
+            ])
+            ->setParameters([
+                'md5' => $name,
+                'local_file' => $localPath,
+                'remote_file' => $this->s3Manager->getUrl(implode('/', $parts).'/'.$name.$extention),
+                'count' => 1
+            ])
+            ->executeStatement();
 
-		return $this->dbManager->getDB()->insert_id;
+		return $this->dbManager->getConnection()->lastInsertId();
 	}
 
 	public function delete(string $remoteFile): void
 	{
 		$result = $this->getByRemoteFile($remoteFile);
         if ($result) {
-            if ($result->count > 1) {
-				$this->dbManager->getDB()->query($this->dbManager->getDB()->prepare("UPDATE {$this->dbManager->getTable()} SET `count` = `count` - 1 WHERE `id` = %d", $result->id));
+            if ($result['count'] > 1) {
+				$this->dbManager->getConnection()->createQueryBuilder()
+                    ->update($this->dbManager->getTable())
+                    ->set('count', 'count - 1')
+                    ->where('id = :id')
+                    ->setParameter('id', $result['id'])
+                    ->executeStatement();
             } else {
                 $url = parse_url($remoteFile);
                 $url['path'] = substr($url['path'], strlen('/public'));
@@ -84,32 +99,45 @@ class AttachmentManager
                 $storage = $this->s3Manager->getStorage();
 				$storage->delete($url['path']);
 
-				$this->dbManager->getDB()->query($this->dbManager->getDB()->prepare("DELETE FROM {$this->dbManager->getTable()} WHERE `id` = %d", $result->id));
+				$this->dbManager->getConnection()->createQueryBuilder()
+                    ->delete($this->dbManager->getTable())
+                    ->where('id = :id')
+                    ->setParameter('id', $result['id'])
+                    ->executeStatement();
             }
         }
 	}
 
-	public function getByID(int $id)
+	public function getByID(int $id): ?array
 	{
-		return $this->dbManager->getDB()->get_row(
-			$this->dbManager->getDB()->prepare("SELECT * FROM {$this->dbManager->getTable()} WHERE `id` = %d", $id),
-			OBJECT
-		);
+		return $this->dbManager->getConnection()->createQueryBuilder()
+            ->select('*')
+            ->from($this->dbManager->getTable())
+            ->where('id = :id')
+            ->setParameter('id', $id)
+            ->executeQuery()
+            ->fetchAssociative() ?: null;
 	}
 
-	public function getByLocalFile(string $localFile)
+	public function getByLocalFile(string $localFile): ?array
 	{
-		return $this->dbManager->getDB()->get_row(
-			$this->dbManager->getDB()->prepare("SELECT * FROM {$this->dbManager->getTable()} WHERE `local_file` = %s", $localFile),
-			OBJECT
-		);
+		return $this->dbManager->getConnection()->createQueryBuilder()
+            ->select('*')
+            ->from($this->dbManager->getTable())
+            ->where('local_file = :local_file')
+            ->setParameter('local_file', $localFile)
+            ->executeQuery()
+            ->fetchAssociative() ?: null;
 	}
 
-	public function getByRemoteFile(string $remoteFile)
+	public function getByRemoteFile(string $remoteFile): ?array
 	{
-		return $this->dbManager->getDB()->get_row(
-			$this->dbManager->getDB()->prepare("SELECT * FROM {$this->dbManager->getTable()} WHERE `remote_file` = %s", $remoteFile),
-			OBJECT
-		);
+		return $this->dbManager->getConnection()->createQueryBuilder()
+            ->select('*')
+            ->from($this->dbManager->getTable())
+            ->where('remote_file = :remote_file')
+            ->setParameter('remote_file', $remoteFile)
+            ->executeQuery()
+            ->fetchAssociative() ?: null;
 	}
 }

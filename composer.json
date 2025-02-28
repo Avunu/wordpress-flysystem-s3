@@ -3,8 +3,9 @@
     "description": "Upload wordpress media files to s3 object storage",
     "type": "library",
     "require": {
-        "php": "^7.4|^8.0",
-        "league/flysystem-aws-s3-v3": "^2.0"
+        "php": "^8",
+        "league/flysystem-aws-s3-v3": "^2",
+        "doctrine/dbal": "^5"
     },
     "license": "MIT",
     "authors": [
@@ -18,5 +19,12 @@
         "psr-4": {
             "Abedi\\WPFlysystemS3\\": "src/"
         }
+    },
+    "require-dev": {
+        "humbug/box": "^4"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "classmap-authoritative": true
     }
 }

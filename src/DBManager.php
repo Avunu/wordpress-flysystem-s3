@@ -2,36 +2,33 @@
 
 namespace Abedi\WPFlysystemS3;
 
+use Doctrine\DBAL\Connection;
+
 class DBManager
 {
-	public static function getInstance(): self
-	{
-		return self::$instance ?: self::$instance = new self();
-	}
+    private static ?self $instance = null;
+    private Connection $connection;
+    private string $table;
 
-	private static ?self $instance = null;
+    public static function getInstance(): self
+    {
+        return self::$instance ?: self::$instance = new self();
+    }
 
-	private $db = null;
+    public function __construct()
+    {
+        global $wpdb;
+        $this->table = $wpdb->base_prefix . 'fs_s3_files';
+        $this->connection = DatabaseConnection::getConnection();
+    }
 
-	public function __construct()
-	{
-	}
+    public function getTable(): string
+    {
+        return $this->table;
+    }
 
-	/**
-	 * @return stdclass Instance of wp-includes/class-wpdb.php reterned.
-	 */
-	public function getDB()
-	{
-		if (!$this->db) {
-			global $wpdb;
-			$this->db = $wpdb;
-		}
-
-		return $this->db;
-	}
-
-	public function getTable(?string $column = null): string
-	{
-		return $this->getDB()->base_prefix.($column ?: "fs_s3_files");
-	}
+    public function getConnection(): Connection
+    {
+        return $this->connection;
+    }
 }

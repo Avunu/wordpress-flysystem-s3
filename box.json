@@ -1,0 +1,23 @@
+{
+    "output": "dist/wp-flysystem-s3.php",
+    "compression": "GZ",
+    "directories": ["src"],
+    "dump-autoload": true,
+    "excludes": ["tests", "*.test.php"],
+    "main": "index.php",
+    "map": [
+        { "Abedi\\WPFlysystemS3\\": "src/" }
+    ],
+    "banner": [
+        "<?php",
+        "/*",
+        " * Plugin Name: Wordpress Flysystem S3",
+        " * Plugin URI: https://bluc.ir/",
+        " * Description: Upload wordpress media files to s3 media library",
+        " * Version: 1.0.0",
+        " * Author: Mehdi Abedi",
+        " * Author URI: https://bluc.ir/",
+        " */",
+        ""
+    ]
+}
